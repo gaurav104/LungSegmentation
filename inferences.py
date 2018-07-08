@@ -1,6 +1,14 @@
+from tqdm import tqdm
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+import torch
+from build_model import *
+from torch.utils.data import DataLoader
+from data_loader import LungSegVal
+from torchvision import transforms
+import torch.nn.functional as F    
 import numpy as np
-from keras.models import load_model
-from keras.preprocessing.image import ImageDataGenerator
+
 from skimage import morphology, color, io, exposure
 
 def IoU(y_true, y_pred):
@@ -25,7 +33,7 @@ def masked(img, gt, mask, alpha=1):
     filled with blue."""
     rows, cols = img.shape[:2]
     color_mask = np.zeros((rows, cols, 3))
-    boundary = morphology.dilation(gt, morphology.disk(3)) - gt
+    boundary = morphology.dilation(gt, morphology.disk(3))^gt
     color_mask[mask == 1] = [0, 0, 1]
     color_mask[boundary == 1] = [1, 0, 0]
     
@@ -49,64 +57,67 @@ if __name__ == '__main__':
     # Path to csv-file. File should contain X-ray filenames as first column,
     # mask filenames as second column.
     # Load test data
-    im_shape = (256, 256)
+    img_size = (864, 864)
 
-    n_test = 20
-    inp_shape = (256,256,3)
+    inp_shape = (864,864,3)
+    batch_size=1
 
     # Load model
-    model_name = 'model.020.hdf5'
-    UNet = load_model(model_name)
+    #model_name = 'model.020.hdf5'
+    #UNet = load_model(model_name)
+    net = SegNet(3,1)
+    net.cuda()
 
-    # For inference standard keras ImageGenerator is used.
-    test_gen = ImageDataGenerator(rescale=1./255)
+    net.load_state_dict(torch.load('Weights_BCE_Dice_InvDice/cp_bce_flip_lr_04_no_rot52_0.04634043872356415.pth.tar'))
+    net.eval()
 
-    ious = np.zeros(n_test)
-    dices = np.zeros(n_test)    
+
+  
     seed = 1
-    image_datagen_test = ImageDataGenerator(rescale  = 1./255)
-    mask_datagen_test = ImageDataGenerator(rescale  = 1./255)
-    
-    image_generator_test = image_datagen_test.flow_from_directory(
-            'Image/Test/',
-            class_mode=None,
-            seed=seed,
-            batch_size=1,
-            target_size= (256,256))
-
-    mask_generator_test = mask_datagen_test.flow_from_directory(
-            'Mask/Test/',
-            class_mode=None,
-            seed=seed,
-            batch_size=1,
-            target_size=(256,256),
-            color_mode='grayscale')
-    
-    test_generator = zip(image_generator_test, mask_generator_test)
-    
+    transformations_test = transforms.Compose([transforms.Resize((864,864)),transforms.ToTensor()]) 
+    test_set = LungSegVal(transforms = transformations_test)
+    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle = False)
+    ious = np.zeros(len(test_loader))
+    dices = np.zeros(len(test_loader))
+    if not(os.path.exists('./results_Unet_BCE_Dice_InvDice_test')):
+        os.mkdir('./results_Unet_BCE_Dice_InvDice_test')
     
 
     i = 0
-    for xx, yy in test_generator:
+    for xx, yy, name in tqdm(test_loader):
+        xx = xx.cuda()
+        yy = yy
+        
+        name = name[0][:-4]
+        print (name)
+        pred = net(xx)
+        pred = F.sigmoid(pred)
+        pred = pred.cpu()
+        pred = pred.detach().numpy()[0,0,:,:]
+        mask = yy.numpy()[0,0,:,:]
+        xx = xx.cpu()
+        xx = xx.numpy()[0,:,:,:].transpose(1,2,0)
         img = exposure.rescale_intensity(np.squeeze(xx), out_range=(0,1))
-        pred = UNet.predict(xx)[..., 0].reshape((256,256))
-        mask = yy[..., 0].reshape((256,256))
 
         # Binarize masks
         gt = mask > 0.5
         pr = pred > 0.5
 
         # Remove regions smaller than 2% of the image
-        pr = remove_small_regions(pr, 0.02 * np.prod(im_shape))
-
-        io.imsave('results/{}.png'.format(i), masked(img, gt, pr, 1))
+        #pr = remove_small_regions(pr, 0.02 * np.prod(img_size))
+       
+        
+        io.imsave('results_Unet_BCE_Dice_InvDice_test/{}.png'.format(name), pr*255)
 
         ious[i] = IoU(gt, pr)
         dices[i] = Dice(gt, pr)
         
         i += 1
-        if i == n_test:
+        if i == len(test_loader):
             break
 
     print ('Mean IoU:', ious.mean())
     print ('Mean Dice:', dices.mean())
+    
+    
+    

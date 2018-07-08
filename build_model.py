@@ -1,55 +1,136 @@
-from keras.models import Model
-from keras.layers.merge import concatenate
-from keras.layers import Input, Convolution2D, MaxPooling2D, UpSampling2D
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from collections import OrderedDict
+
+class SegNet(nn.Module):
+    def __init__(self,input_nbr,label_nbr):
+        super(SegNet, self).__init__()
+
+        
+        self.conv11 = nn.Conv2d(input_nbr, 64, kernel_size=3, padding=1)
+        self.bn11 = nn.BatchNorm2d(64)
+        self.conv12 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn12 = nn.BatchNorm2d(64)
+
+        self.conv21 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn21 = nn.BatchNorm2d(128)
+        self.conv22 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.bn22 = nn.BatchNorm2d(128)
+
+        self.conv31 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.bn31 = nn.BatchNorm2d(256)
+        self.conv32 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn32 = nn.BatchNorm2d(256)
+        self.conv33 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn33 = nn.BatchNorm2d(256)
+
+        self.conv41 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
+        self.bn41 = nn.BatchNorm2d(512)
+        self.conv42 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn42 = nn.BatchNorm2d(512)
+        self.conv43 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn43 = nn.BatchNorm2d(512)
+
+        self.conv51 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn51 = nn.BatchNorm2d(512)
+        self.conv52 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn52 = nn.BatchNorm2d(512)
+        self.conv53 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn53 = nn.BatchNorm2d(512)
+
+        self.conv53d = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn53d = nn.BatchNorm2d(512)
+        self.conv52d = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn52d = nn.BatchNorm2d(512)
+        self.conv51d = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn51d = nn.BatchNorm2d(512)
+
+        self.conv43d = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn43d = nn.BatchNorm2d(512)
+        self.conv42d = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn42d = nn.BatchNorm2d(512)
+        self.conv41d = nn.Conv2d(512, 256, kernel_size=3, padding=1)
+        self.bn41d = nn.BatchNorm2d(256)
+
+        self.conv33d = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn33d = nn.BatchNorm2d(256)
+        self.conv32d = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn32d = nn.BatchNorm2d(256)
+        self.conv31d = nn.Conv2d(256,  128, kernel_size=3, padding=1)
+        self.bn31d = nn.BatchNorm2d(128)
+
+        self.conv22d = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.bn22d = nn.BatchNorm2d(128)
+        self.conv21d = nn.Conv2d(128, 64, kernel_size=3, padding=1)
+        self.bn21d = nn.BatchNorm2d(64)
+
+        self.conv12d = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn12d = nn.BatchNorm2d(64)
+        self.conv11d = nn.Conv2d(64, label_nbr, kernel_size=3, padding=1)
+        self.Dropout = nn.Dropout(0.5)
 
 
-def build_UNet2D_4L(inp_shape, k_size=3):
-    merge_axis = -1 # Feature maps are concatenated along last axis (for tf backend)
-    data = Input(shape=inp_shape)
-    conv1 = Convolution2D(filters=32, kernel_size=k_size, padding='same', activation='relu')(data)
-    conv1 = Convolution2D(filters=32, kernel_size=k_size, padding='same', activation='relu')(conv1)
-    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
+    def forward(self, x):
 
-    conv2 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(pool1)
-    conv2 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(conv2)
-    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
+        # Stage 1
+        x11 = F.relu(self.bn11(self.conv11(x)))
+        x11 = self.Dropout(x11)
+        x12 = F.relu(self.bn12(self.conv12(x11)))
+        x1p, id1 = F.max_pool2d(x12,kernel_size=2, stride=2,return_indices=True)
 
-    conv3 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(pool2)
-    conv3 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(conv3)
-    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
+        # Stage 2
+        x21 = F.relu(self.bn21(self.conv21(x1p)))
+        x22 = F.relu(self.bn22(self.conv22(x21)))
+        x2p, id2 = F.max_pool2d(x22,kernel_size=2, stride=2,return_indices=True)
 
-    conv4 = Convolution2D(filters=128, kernel_size=k_size, padding='same', activation='relu')(pool3)
-    conv4 = Convolution2D(filters=128, kernel_size=k_size, padding='same', activation='relu')(conv4)
-    pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
+        # Stage 3
+        x31 = F.relu(self.bn31(self.conv31(x2p)))
+        x31 = self.Dropout(x31)
+        x32 = F.relu(self.bn32(self.conv32(x31)))
+        x33 = F.relu(self.bn33(self.conv33(x32)))
+        x3p, id3 = F.max_pool2d(x33,kernel_size=2, stride=2,return_indices=True)
 
-    conv5 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(pool4)
+        # Stage 4
+        x41 = F.relu(self.bn41(self.conv41(x3p)))
+        x42 = F.relu(self.bn42(self.conv42(x41)))
+        x43 = F.relu(self.bn43(self.conv43(x42)))
+        x4p, id4 = F.max_pool2d(x43,kernel_size=2, stride=2,return_indices=True)
 
-    up1 = UpSampling2D(size=(2, 2))(conv5)
-    conv6 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(up1)
-    conv6 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(conv6)
-    merged1 = concatenate([conv4, conv6], axis=merge_axis)
-    conv6 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(merged1)
+        # Stage 5
+        x51 = F.relu(self.bn51(self.conv51(x4p)))
+        x51 = self.Dropout(x51)
+        x52 = F.relu(self.bn52(self.conv52(x51)))
+        x53 = F.relu(self.bn53(self.conv53(x52)))
+        x5p, id5 = F.max_pool2d(x53,kernel_size=2, stride=2,return_indices=True)
 
-    up2 = UpSampling2D(size=(2, 2))(conv6)
-    conv7 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(up2)
-    conv7 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(conv7)
-    merged2 = concatenate([conv3, conv7], axis=merge_axis)
-    conv7 = Convolution2D(filters=256, kernel_size=k_size, padding='same', activation='relu')(merged2)
 
-    up3 = UpSampling2D(size=(2, 2))(conv7)
-    conv8 = Convolution2D(filters=128, kernel_size=k_size, padding='same', activation='relu')(up3)
-    conv8 = Convolution2D(filters=128, kernel_size=k_size, padding='same', activation='relu')(conv8)
-    merged3 = concatenate([conv2, conv8], axis=merge_axis)
-    conv8 = Convolution2D(filters=128, kernel_size=k_size, padding='same', activation='relu')(merged3)
+        # Stage 5d
+        x5d = F.max_unpool2d(x5p, id5, kernel_size=2, stride=2)
+        x53d = F.relu(self.bn53d(self.conv53d(x5d)))
+        x52d = F.relu(self.bn52d(self.conv52d(x53d)))
+        x51d = F.relu(self.bn51d(self.conv51d(x52d)))
 
-    up4 = UpSampling2D(size=(2, 2))(conv8)
-    conv9 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(up4)
-    conv9 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(conv9)
-    merged4 = concatenate([conv1, conv9], axis=merge_axis)
-    conv9 = Convolution2D(filters=64, kernel_size=k_size, padding='same', activation='relu')(merged4)
+        # Stage 4d
+        x4d = F.max_unpool2d(x51d, id4, kernel_size=2, stride=2)
+        x43d = F.relu(self.bn43d(self.conv43d(x4d)))
+        x42d = F.relu(self.bn42d(self.conv42d(x43d)))
+        x41d = F.relu(self.bn41d(self.conv41d(x42d)))
 
-    conv10 = Convolution2D(filters=1, kernel_size=k_size, padding='same', activation='sigmoid')(conv9)
+        # Stage 3d
+        x3d = F.max_unpool2d(x41d, id3, kernel_size=2, stride=2)
+        x33d = F.relu(self.bn33d(self.conv33d(x3d)))
+        x32d = F.relu(self.bn32d(self.conv32d(x33d)))
+        x31d = F.relu(self.bn31d(self.conv31d(x32d)))
 
-    output = conv10
-    model = Model(data, output)
-    return model
+        # Stage 2d
+        x2d = F.max_unpool2d(x31d, id2, kernel_size=2, stride=2)
+        x22d = F.relu(self.bn22d(self.conv22d(x2d)))
+        x21d = F.relu(self.bn21d(self.conv21d(x22d)))
+
+        # Stage 1d
+        x1d = F.max_unpool2d(x21d, id1, kernel_size=2, stride=2)
+        x12d = F.relu(self.bn12d(self.conv12d(x1d)))
+        x11d = self.conv11d(x12d)
+
+        return x11d
