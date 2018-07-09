@@ -1,0 +1,49 @@
+UNet(bilinear) BCE_loss
+
+(with Flipping in realtime)
+('Mean IoU:', 0.9060794828941379)
+('Mean Dice:', 0.9505207747694377)
+
+(no Flipping)
+('Mean IoU:', 0.9350350587463033)
+('Mean Dice:', 0.9663559721631583)
+
+(Flipping and Noise)
+('Mean IoU:', 0.9403301265614896)
+('Mean Dice:', 0.969221751380565)
+
+
+
+
+
+
+
+UNet(bilinear) BCE_loss + Dice
+
+(Flipping in realtime)
+('Mean IoU:', 0.8993405777542494)
+('Mean Dice:', 0.9468607435441629)
+
+(Flipping + Noise)
+('Mean IoU:', 0.9426167844499045)
+('Mean Dice:', 0.970421860911066)
+
+
+
+
+
+UNet(bilinear) BCE + Dice + InvDice
+(Flipping + Noise)
+('Mean IoU:', 0.9379613208481775)
+('Mean Dice:', 0.9679506541131151)
+
+(Flipping + Noise + No random Rotation)
+('Mean IoU:', 0.9665012522183872)
+('Mean Dice:', 0.9829327195790153)
+
+Test Report
+('Mean IoU:', 0.9295389541727913)
+('Mean Dice:', 0.9623430243881239)
+
+
+
